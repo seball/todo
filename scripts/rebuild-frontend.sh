@@ -25,9 +25,18 @@ fi
 echo "Usuwanie starego buildu..."
 rm -rf build
 
-# Buduj nową wersję
+# Dodaj web-vitals jeśli brakuje
+if ! grep -q "web-vitals" package.json; then
+    echo "Dodaję web-vitals..."
+    npm install web-vitals --save
+fi
+
+# Buduj nową wersję z ograniczeniem pamięci
 echo "Budowanie frontendu..."
+export NODE_OPTIONS="--max-old-space-size=512"
+export GENERATE_SOURCEMAP=false
 npm run build
+unset NODE_OPTIONS
 
 # Sprawdź czy build się udał
 if [ ! -d "build" ]; then

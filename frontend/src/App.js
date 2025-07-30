@@ -57,8 +57,9 @@ function App() {
       const canvas = document.getElementById('qr-code');
       if (canvas) {
         await QRCode.toCanvas(canvas, wifiString, {
-          width: 256,
-          margin: 2
+          width: 180,
+          margin: 1,
+          scale: 1
         });
       }
     } catch (err) {
