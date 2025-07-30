@@ -1,20 +1,207 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const fs = require("fs");
-const { exec } = require("child_process");
+const { exec, execSync } = require("child_process");
+const path = require("path");
 
 const app = express();
+app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(express.static("frontend"));
 
+// Serwuj pliki React build
+app.use(express.static(path.join(__dirname, "../frontend/build")));
+
+// Stan aplikacji
+let currentMode = "init"; // init, hotspot, connected
+let hotspotInfo = null;
+
+// Endpoint do sprawdzania statusu
+app.get("/api/status", (req, res) => {
+  res.json({ 
+    mode: currentMode,
+    hotspotInfo: hotspotInfo 
+  });
+});
+
+// Endpoint do uruchamiania hotspota
+app.post("/api/start-hotspot", async (req, res) => {
+  try {
+    // Generuj losowe dane hotspota
+    const ssid = `RaspberryPi-${Math.random().toString(36).substring(7)}`;
+    const password = Math.random().toString(36).substring(2, 10);
+    
+    // Konfiguracja hostapd
+    const hostapdConfig = `
+interface=wlan0
+driver=nl80211
+ssid=${ssid}
+hw_mode=g
+channel=7
+wmm_enabled=0
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase=${password}
+wpa_key_mgmt=WPA-PSK
+wpa_pairwise=TKIP
+rsn_pairwise=CCMP
+`;
+
+    // Konfiguracja dnsmasq
+    const dnsmasqConfig = `
+interface=wlan0
+dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
+domain=local
+address=/local/192.168.4.1
+`;
+
+    // Zapisz konfiguracje
+    fs.writeFileSync("/tmp/hostapd.conf", hostapdConfig);
+    fs.writeFileSync("/tmp/dnsmasq.conf", dnsmasqConfig);
+    
+    // Przełącz w tryb AP
+    exec(`sudo bash -c '
+      systemctl stop wpa_supplicant
+      ip link set wlan0 down
+      ip addr flush dev wlan0
+      ip link set wlan0 up
+      ip addr add 192.168.4.1/24 dev wlan0
+      
+      # Uruchom hostapd i dnsmasq
+      killall hostapd dnsmasq 2>/dev/null || true
+      hostapd /tmp/hostapd.conf -B
+      dnsmasq -C /tmp/dnsmasq.conf
+      
+      # Włącz routing
+      echo 1 > /proc/sys/net/ipv4/ip_forward
+      iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+      iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
+      iptables -A FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+    '`, (err, stdout, stderr) => {
+      if (err) {
+        console.error("Błąd uruchamiania hotspota:", err);
+        return res.status(500).json({ error: "Nie można uruchomić hotspota" });
+      }
+      
+      currentMode = "hotspot";
+      hotspotInfo = { ssid, password };
+      res.json(hotspotInfo);
+    });
+    
+  } catch (err) {
+    console.error("Błąd:", err);
+    res.status(500).json({ error: "Błąd serwera" });
+  }
+});
+
+// Endpoint do skanowania sieci WiFi
+app.get("/api/scan-wifi", (req, res) => {
+  exec("sudo iwlist wlan0 scan | grep -E 'ESSID:|Quality='", (err, stdout) => {
+    if (err) {
+      return res.status(500).json({ error: "Nie można zeskanować sieci" });
+    }
+    
+    const lines = stdout.split("\n");
+    const networks = [];
+    
+    for (let i = 0; i < lines.length - 1; i += 2) {
+      const qualityMatch = lines[i].match(/Quality=(\d+)\/70/);
+      const ssidMatch = lines[i + 1].match(/ESSID:"(.+)"/);
+      
+      if (qualityMatch && ssidMatch) {
+        const signal = Math.round((parseInt(qualityMatch[1]) / 70) * 100);
+        networks.push({
+          ssid: ssidMatch[1],
+          signal: signal
+        });
+      }
+    }
+    
+    // Usuń duplikaty i posortuj po sile sygnału
+    const uniqueNetworks = networks.filter((net, index, self) =>
+      index === self.findIndex((n) => n.ssid === net.ssid)
+    ).sort((a, b) => b.signal - a.signal);
+    
+    res.json({ networks: uniqueNetworks });
+  });
+});
+
+// Endpoint do łączenia z WiFi
+app.post("/api/connect-wifi", (req, res) => {
+  const { ssid, password } = req.body;
+  
+  if (!ssid || !password) {
+    return res.status(400).json({ error: "Brak SSID lub hasła" });
+  }
+  
+  // Przełącz z trybu AP na klienta
+  exec(`sudo bash -c '
+    # Zatrzymaj AP
+    killall hostapd dnsmasq 2>/dev/null || true
+    
+    # Przywróć tryb klienta
+    ip addr flush dev wlan0
+    systemctl start wpa_supplicant
+    
+    # Skonfiguruj nową sieć
+    wpa_cli -i wlan0 remove_network all
+    NETWORK_ID=$(wpa_cli -i wlan0 add_network | tail -n 1)
+    wpa_cli -i wlan0 set_network $NETWORK_ID ssid \\"${ssid}\\"
+    wpa_cli -i wlan0 set_network $NETWORK_ID psk \\"${password}\\"
+    wpa_cli -i wlan0 enable_network $NETWORK_ID
+    wpa_cli -i wlan0 save_config
+    
+    # Poczekaj na połączenie
+    sleep 5
+    
+    # Sprawdź status
+    wpa_cli -i wlan0 status | grep -q "wpa_state=COMPLETED"
+  '`, (err, stdout, stderr) => {
+    if (err) {
+      console.error("Błąd połączenia:", err);
+      return res.status(500).json({ error: "Nie można połączyć z siecią" });
+    }
+    
+    // Sprawdź czy połączono
+    exec("wpa_cli -i wlan0 status | grep wpa_state", (err2, stdout2) => {
+      if (!err2 && stdout2.includes("COMPLETED")) {
+        currentMode = "connected";
+        res.json({ success: true });
+      } else {
+        res.status(500).json({ error: "Nie udało się połączyć z siecią" });
+      }
+    });
+  });
+});
+
+// Stara funkcjonalność dla kompatybilności
 app.post("/connect", (req, res) => {
   const { ssid, password } = req.body;
-  const config = `\nnetwork={\n  ssid=\"${ssid}\"\n  psk=\"${password}\"\n}`;
-  fs.appendFileSync("/etc/wpa_supplicant/wpa_supplicant.conf", config);
-  exec("sudo wpa_cli -i wlan0 reconfigure", (err) => {
+  const config = `
+interface wlan0
+static ip_address=192.168.1.100/24
+static routers=192.168.1.1
+static domain_name_servers=192.168.1.1 8.8.8.8
+
+network={
+  ssid="${ssid}"
+  psk="${password}"
+}`;
+  
+  fs.writeFileSync("/etc/dhcpcd.conf", config);
+  exec("sudo systemctl restart dhcpcd", (err) => {
     if (err) return res.status(500).send("Błąd połączenia");
     res.send("Połączono z siecią Wi-Fi");
   });
 });
 
-app.listen(80, () => console.log("Serwer działa na porcie 80"));
+// Dla React Router - wszystkie inne ścieżki zwracają index.html
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/build", "index.html"));
+});
+
+app.listen(80, () => {
+  console.log("Serwer działa na porcie 80");
+  console.log("Tryb kiosku WiFi aktywny");
+});

@@ -1,14 +1,21 @@
 [Unit]
-Description=WiFi Kiosk Service
+Description=WiFi Kiosk Backend Service
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/bin/bash /home/pi/wifi-kiosk/scripts/start.sh
+User=root
+WorkingDirectory=/home/pi/wifi-kiosk/backend
+ExecStart=/usr/bin/node /home/pi/wifi-kiosk/backend/server.js
 Restart=always
-User=pi
-Environment=DISPLAY=:0
-Environment=XAUTHORITY=/home/pi/.Xauthority
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=wifi-kiosk-backend
+
+# Zmienne środowiskowe
+Environment="NODE_ENV=production"
+Environment="PORT=80"
 
 [Install]
 WantedBy=multi-user.target

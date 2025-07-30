@@ -1,0 +1,18 @@
+[Unit]
+Description=WiFi Kiosk GUI (Chromium Kiosk Mode)
+After=graphical.target wifi-kiosk-backend.service
+Wants=graphical.target
+Requires=wifi-kiosk-backend.service
+
+[Service]
+Type=simple
+User=pi
+Environment="DISPLAY=:0"
+Environment="XAUTHORITY=/home/pi/.Xauthority"
+ExecStartPre=/bin/sleep 10
+ExecStart=/bin/bash /home/pi/wifi-kiosk/scripts/start-kiosk.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=graphical.target
