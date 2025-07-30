@@ -6,6 +6,22 @@ set -e
 echo "=== Instalacja WiFi Kiosk na Raspberry Pi OS Lite ==="
 echo ""
 
+# Sprawdź i utwórz swap jeśli mało RAM
+TOTAL_MEM=$(free -m | awk '/^Mem:/{print $2}')
+if [ $TOTAL_MEM -lt 1024 ]; then
+    echo "Wykryto mało RAM ($TOTAL_MEM MB), tworzę swap..."
+    if ! swapon --show | grep -q swapfile; then
+        sudo fallocate -l 1G /swapfile
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        if ! grep -q "/swapfile" /etc/fstab; then
+            echo "/swapfile none swap sw 0 0" | sudo tee -a /etc/fstab
+        fi
+        echo "Swap 1GB utworzony!"
+    fi
+fi
+
 # Sprawdź czy to jest Lite (brak środowiska graficznego)
 if pgrep -x "lxsession" > /dev/null || pgrep -x "gnome-session" > /dev/null; then
     echo "Wykryto pełne środowisko graficzne. Użyj ./scripts/install.sh"
@@ -81,7 +97,17 @@ cd ..
 echo "7/8 Budowanie frontendu React..."
 cd frontend
 npm install
+
+# Dodaj web-vitals jeśli brakuje
+if ! grep -q "web-vitals" package.json; then
+    npm install web-vitals --save
+fi
+
+# Build z ograniczeniem pamięci
+export NODE_OPTIONS="--max-old-space-size=512"
+export GENERATE_SOURCEMAP=false
 npm run build
+unset NODE_OPTIONS
 cd ..
 
 # Konfiguracja GUI dla Lite
