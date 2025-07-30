@@ -1,0 +1,14 @@
+[Unit]
+Description=WiFi Kiosk Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash /home/pi/wifi-kiosk/scripts/start.sh
+Restart=always
+User=pi
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+
+[Install]
+WantedBy=multi-user.target

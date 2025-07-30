@@ -1,0 +1,6 @@
+{
+  "name": "backend",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
