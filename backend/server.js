@@ -135,9 +135,9 @@ app.post("/api/connect-wifi", (req, res) => {
     return res.status(400).json({ error: "Brak SSID lub hasła" });
   }
   
-  // Przełącz z trybu AP na klienta
+  // Prosty test - próbuj połączyć z timeout
   exec(`sudo bash -c '
-    # Zatrzymaj AP
+    # Zatrzymaj AP tymczasowo
     killall hostapd dnsmasq 2>/dev/null || true
     
     # Przywróć tryb klienta
@@ -152,26 +152,55 @@ app.post("/api/connect-wifi", (req, res) => {
     wpa_cli -i wlan0 enable_network $NETWORK_ID
     wpa_cli -i wlan0 save_config
     
-    # Poczekaj na połączenie
-    sleep 5
+    # Poczekaj na połączenie - max 20 sekund
+    for i in {1..20}; do
+      if wpa_cli -i wlan0 status | grep -q "wpa_state=COMPLETED"; then
+        echo "CONNECTION_SUCCESS"
+        exit 0
+      fi
+      sleep 1
+    done
     
-    # Sprawdź status
-    wpa_cli -i wlan0 status | grep -q "wpa_state=COMPLETED"
+    echo "CONNECTION_FAILED"
+    exit 1
   '`, (err, stdout, stderr) => {
-    if (err) {
-      console.error("Błąd połączenia:", err);
-      return res.status(500).json({ error: "Nie można połączyć z siecią" });
-    }
+    console.log("Connection attempt:", stdout, stderr);
     
-    // Sprawdź czy połączono
-    exec("wpa_cli -i wlan0 status | grep wpa_state", (err2, stdout2) => {
-      if (!err2 && stdout2.includes("COMPLETED")) {
-        currentMode = "connected";
-        res.json({ success: true });
-      } else {
-        res.status(500).json({ error: "Nie udało się połączyć z siecią" });
-      }
-    });
+    if (!err && stdout.includes("CONNECTION_SUCCESS")) {
+      // Sukces - połączono z nową siecią
+      currentMode = "connected";
+      res.json({ success: true, message: "Połączono z nową siecią WiFi" });
+    } else {
+      // Niepowodzenie - przywróć hotspot
+      console.log("Connection failed, restoring hotspot...");
+      
+      // Przywróć hotspot z tymi samymi danymi
+      exec(`sudo bash -c '
+        systemctl stop wpa_supplicant
+        ip link set wlan0 down
+        ip addr flush dev wlan0
+        ip link set wlan0 up
+        ip addr add 192.168.4.1/24 dev wlan0
+        
+        # Uruchom hostapd i dnsmasq ponownie
+        hostapd /tmp/hostapd.conf -B
+        dnsmasq -C /tmp/dnsmasq.conf
+        
+        # Włącz routing
+        echo 1 > /proc/sys/net/ipv4/ip_forward
+        iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || true
+        iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT 2>/dev/null || true
+        iptables -A FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
+      '`, (restoreErr) => {
+        if (restoreErr) {
+          console.error("Error restoring hotspot:", restoreErr);
+        }
+        res.status(400).json({ 
+          error: "Nie udało się połączyć. Sprawdź SSID i hasło. Hotspot przywrócony.",
+          keepHotspot: true 
+        });
+      });
+    }
   });
 });
 

@@ -57,9 +57,13 @@ function App() {
       const canvas = document.getElementById('qr-code');
       if (canvas) {
         await QRCode.toCanvas(canvas, wifiString, {
-          width: 180,
+          width: 160,
           margin: 1,
-          scale: 1
+          scale: 1,
+          color: {
+            dark: '#1e3c72',
+            light: '#FFFFFF'
+          }
         });
       }
     } catch (err) {
@@ -109,14 +113,19 @@ function App() {
       <div className="App">
         <h1>Konfiguracja WiFi</h1>
         <div className="hotspot-info">
-          <h2>Połącz się z hotspotem:</h2>
-          <p><strong>Nazwa sieci:</strong> {hotspotInfo.ssid}</p>
-          <p><strong>Hasło:</strong> {hotspotInfo.password}</p>
-          <div className="qr-code">
-            <canvas id="qr-code"></canvas>
+          <div className="qr-section">
+            <div className="qr-code">
+              <canvas id="qr-code"></canvas>
+            </div>
           </div>
-          <p>Po połączeniu wróć do tej strony</p>
-          <button onClick={scanNetworks}>Skonfiguruj WiFi</button>
+          <div className="instructions">
+            <h3>Jak się połączyć?</h3>
+            <ol>
+              <li>Zeskanuj kod QR telefonem</li>
+              <li>Połącz się z siecią WiFi</li>
+              <li>Otwórz przeglądarkę na 192.168.4.1</li>
+            </ol>
+          </div>
         </div>
       </div>
     );
