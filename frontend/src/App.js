@@ -38,7 +38,7 @@ const CalibrationGrid = () => {
       <div className="ruler-x"></div>
       <div className="ruler-y"></div>
       
-      {/* Obszar roboczy 320x480 */}
+      {/* Obszar roboczy 480x320 */}
       <div className="work-area">
         <div style={{
           position: 'absolute',
@@ -52,7 +52,7 @@ const CalibrationGrid = () => {
           fontWeight: 'bold',
           fontSize: '14px'
         }}>
-          320x480
+          480x320
         </div>
       </div>
       
@@ -67,9 +67,9 @@ const CalibrationGrid = () => {
       <div style={{
         position: 'absolute',
         top: '0',
-        left: '350px',
-        width: '320px',
-        height: '480px',
+        left: '500px',
+        width: '480px',
+        height: '320px',
         border: '2px dashed #0080ff',
         background: 'rgba(0, 128, 255, 0.05)'
       }}>
@@ -83,7 +83,7 @@ const CalibrationGrid = () => {
           fontSize: '10px',
           borderRadius: '3px'
         }}>
-          Przesunięty +350px
+          Przesunięty +500px
         </div>
       </div>
     </div>

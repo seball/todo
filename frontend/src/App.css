@@ -37,13 +37,13 @@
     0 0;
 }
 
-/* Obszar roboczy 320x480 */
+/* Obszar roboczy 480x320 */
 .calibration-grid .work-area {
   position: absolute;
   top: 0;
   left: 0;
-  width: 320px;
-  height: 480px;
+  width: 480px;
+  height: 320px;
   border: 3px solid #00ff00;
   box-shadow: 0 0 0 1px #000, 0 0 0 2px #00ff00;
   background: rgba(0, 255, 0, 0.05);
@@ -51,7 +51,7 @@
 
 /* Znaczniki na rogach */
 .calibration-grid::before {
-  content: '320x480';
+  content: '480x320';
   position: absolute;
   top: 5px;
   left: 5px;
@@ -75,8 +75,8 @@
   background-image:
     linear-gradient(to right, rgba(0, 255, 0, 0.8) 2px, transparent 2px),
     linear-gradient(to bottom, rgba(0, 255, 0, 0.8) 2px, transparent 2px);
-  background-size: 320px 480px;
-  background-position: 160px 0, 0 240px;
+  background-size: 480px 320px;
+  background-position: 240px 0, 0 160px;
 }
 
 /* Dodatkowe znaczniki kalibracyjne */
@@ -186,8 +186,8 @@ body {
 .App {
   position: absolute;
   top: 0;
-  width: 320px;
-  height: 480px;
+  width: 480px;
+  height: 320px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -210,19 +210,19 @@ h1 {
 
 .hotspot-info {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
+  justify-content: space-around;
   text-align: center;
   width: 100%;
-  max-width: 280px;
+  gap: 20px;
 }
 
 .qr-section {
   background: white;
-  padding: 20px;
-  border-radius: 20px;
+  padding: 15px;
+  border-radius: 15px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-  margin-bottom: 25px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -235,22 +235,22 @@ h1 {
 }
 
 .qr-code canvas {
-  width: 160px;
-  height: 160px;
+  width: 120px;
+  height: 120px;
 }
 
 .instructions {
   color: white;
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 1.5;
   text-align: left;
-  width: 100%;
+  flex: 1;
 }
 
 .instructions h3 {
-  font-size: 16px;
-  margin-bottom: 15px;
-  text-align: center;
+  font-size: 15px;
+  margin-bottom: 10px;
+  text-align: left;
   color: #ffffff;
   font-weight: 400;
 }
@@ -262,10 +262,11 @@ h1 {
 }
 
 .instructions li {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   position: relative;
-  padding-left: 30px;
+  padding-left: 25px;
   counter-increment: step-counter;
+  font-size: 12px;
 }
 
 .instructions li::before {
@@ -339,25 +340,34 @@ select {
   font-size: 14px;
 }
 
-/* Responsive font sizes dla bardzo małego ekranu */
-@media (max-height: 500px) {
+/* Responsive font sizes dla poziomego ekranu */
+@media (max-height: 350px) {
   h1 {
-    font-size: 16px;
+    font-size: 18px;
     margin-bottom: 10px;
   }
   
   .hotspot-info p {
-    font-size: 12px;
+    font-size: 11px;
   }
   
   button {
-    padding: 10px 16px;
-    font-size: 13px;
+    padding: 8px 14px;
+    font-size: 12px;
   }
   
   .qr-code canvas {
-    max-width: 150px;
-    max-height: 150px;
+    width: 100px;
+    height: 100px;
+  }
+  
+  .qr-section {
+    padding: 10px;
+  }
+  
+  .instructions li {
+    font-size: 11px;
+    margin-bottom: 5px;
   }
 }
 
