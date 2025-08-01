@@ -52,6 +52,26 @@ sudo systemctl restart wifi-kiosk-backend
 if systemctl is-enabled wifi-kiosk-gui >/dev/null 2>&1; then
     sudo systemctl restart wifi-kiosk-gui
     echo "GUI service zrestartowane"
+else
+    # Jeśli nie ma systemd service, spróbuj przeładować Chromium bezpośrednio
+    echo "Próba przeładowania przeglądarki..."
+    
+    # Opcja 1: Wyślij SIGHUP do Chromium (przeładowanie strony)
+    if pgrep -x "chromium-browser" > /dev/null || pgrep -x "chromium" > /dev/null; then
+        # Znajdź PID Chromium
+        CHROMIUM_PID=$(pgrep -x "chromium-browser" || pgrep -x "chromium" | head -1)
+        if [ ! -z "$CHROMIUM_PID" ]; then
+            # Wyślij Ctrl+R do okna Chromium przez xdotool
+            if command -v xdotool >/dev/null 2>&1; then
+                export DISPLAY=:0
+                xdotool search --onlyvisible --class chromium windowfocus key ctrl+r
+                echo "✓ Strona przeładowana (Ctrl+R)"
+            else
+                echo "⚠ xdotool nie zainstalowany - nie mogę przeładować strony"
+                echo "  Zainstaluj: sudo apt-get install xdotool"
+            fi
+        fi
+    fi
 fi
 
 echo "5. Sprawdzanie statusu..."

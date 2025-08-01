@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import './App.css';
 
+const CalibrationGrid = () => (
+  <div className="calibration-grid">
+    <div className="corner-marker top-left"></div>
+    <div className="corner-marker top-right"></div>
+    <div className="corner-marker bottom-left"></div>
+    <div className="corner-marker bottom-right"></div>
+    <div className="dimension-marker bottom">320x480</div>
+    <div className="dimension-marker center">160x240</div>
+  </div>
+);
+
 function App() {
   const [mode, setMode] = useState('loading'); // loading, hotspot, configuring, connected
   const [hotspotInfo, setHotspotInfo] = useState(null);
@@ -9,6 +20,7 @@ function App() {
   const [selectedNetwork, setSelectedNetwork] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [showGrid, setShowGrid] = useState(true); // Domyślnie włączona siatka
 
   useEffect(() => {
     checkStatus();
@@ -105,12 +117,24 @@ function App() {
   };
 
   if (mode === 'loading') {
-    return <div className="App"><h1>Ładowanie...</h1></div>;
+    return (
+      <div className="App">
+        {showGrid && <CalibrationGrid />}
+        <button className="grid-toggle" onClick={() => setShowGrid(!showGrid)}>
+          {showGrid ? 'Ukryj siatkę' : 'Pokaż siatkę'}
+        </button>
+        <h1>Ładowanie...</h1>
+      </div>
+    );
   }
 
   if (mode === 'hotspot' && hotspotInfo) {
     return (
       <div className="App">
+        {showGrid && <CalibrationGrid />}
+        <button className="grid-toggle" onClick={() => setShowGrid(!showGrid)}>
+          {showGrid ? 'Ukryj siatkę' : 'Pokaż siatkę'}
+        </button>
         <h1>Konfiguracja WiFi</h1>
         <div className="hotspot-info">
           <div className="qr-section">
@@ -134,6 +158,10 @@ function App() {
   if (mode === 'configuring') {
     return (
       <div className="App">
+        {showGrid && <CalibrationGrid />}
+        <button className="grid-toggle" onClick={() => setShowGrid(!showGrid)}>
+          {showGrid ? 'Ukryj siatkę' : 'Pokaż siatkę'}
+        </button>
         <h1>Wybierz sieć WiFi</h1>
         {error && <p className="error">{error}</p>}
         <form onSubmit={connectToWifi}>
@@ -165,6 +193,10 @@ function App() {
   if (mode === 'connected') {
     return (
       <div className="App">
+        {showGrid && <CalibrationGrid />}
+        <button className="grid-toggle" onClick={() => setShowGrid(!showGrid)}>
+          {showGrid ? 'Ukryj siatkę' : 'Pokaż siatkę'}
+        </button>
         <h1>Połączono z WiFi!</h1>
         <p>Urządzenie jest teraz połączone z internetem.</p>
       </div>

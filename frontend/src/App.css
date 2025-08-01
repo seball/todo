@@ -5,6 +5,126 @@
   box-sizing: border-box;
 }
 
+/* Siatka kalibracyjna */
+.calibration-grid {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 320px;
+  height: 480px;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: 
+    linear-gradient(to right, rgba(255, 0, 0, 0.3) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 0, 0, 0.3) 1px, transparent 1px),
+    linear-gradient(to right, rgba(255, 0, 0, 0.6) 2px, transparent 2px),
+    linear-gradient(to bottom, rgba(255, 0, 0, 0.6) 2px, transparent 2px);
+  background-size: 
+    10px 10px,
+    10px 10px,
+    50px 50px,
+    50px 50px;
+  background-position:
+    0 0,
+    0 0,
+    0 0,
+    0 0;
+  border: 2px solid #ff0000;
+  box-sizing: border-box;
+}
+
+/* Znaczniki na rogach */
+.calibration-grid::before {
+  content: '320x480';
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  color: #ff0000;
+  font-size: 12px;
+  font-weight: bold;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+/* Linie środkowe */
+.calibration-grid::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    linear-gradient(to right, rgba(0, 255, 0, 0.8) 2px, transparent 2px),
+    linear-gradient(to bottom, rgba(0, 255, 0, 0.8) 2px, transparent 2px);
+  background-size: 320px 480px;
+  background-position: 160px 0, 0 240px;
+}
+
+/* Dodatkowe znaczniki kalibracyjne */
+.calibration-grid .corner-marker {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border: 2px solid #ff0000;
+}
+
+.calibration-grid .corner-marker.top-left {
+  top: 0;
+  left: 0;
+  border-right: none;
+  border-bottom: none;
+}
+
+.calibration-grid .corner-marker.top-right {
+  top: 0;
+  right: 0;
+  border-left: none;
+  border-bottom: none;
+}
+
+.calibration-grid .corner-marker.bottom-left {
+  bottom: 0;
+  left: 0;
+  border-right: none;
+  border-top: none;
+}
+
+.calibration-grid .corner-marker.bottom-right {
+  bottom: 0;
+  right: 0;
+  border-left: none;
+  border-top: none;
+}
+
+/* Znaczniki wymiarów */
+.calibration-grid .dimension-marker {
+  position: absolute;
+  color: #ff0000;
+  font-size: 10px;
+  font-weight: bold;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2px 4px;
+  border-radius: 2px;
+  font-family: monospace;
+}
+
+.calibration-grid .dimension-marker.bottom {
+  bottom: 5px;
+  right: 5px;
+  content: '320x480';
+}
+
+.calibration-grid .dimension-marker.center {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 255, 0, 0.9);
+  color: #000;
+}
+
 body {
   overflow: hidden;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -184,4 +304,26 @@ select {
     max-width: 150px;
     max-height: 150px;
   }
+}
+
+/* Przycisk do przełączania siatki */
+.grid-toggle {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  z-index: 10000;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  border: 2px solid #ff0000;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: monospace;
+  font-weight: bold;
+}
+
+.grid-toggle:hover {
+  background: #ff0000;
+  color: white;
 }
