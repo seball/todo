@@ -3,7 +3,55 @@
 
 set -e
 
+# Parsuj argumenty
+SKIP_BUILD=false
+SKIP_NPM=false
+BACKEND_ONLY=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --skip-build)
+            SKIP_BUILD=true
+            shift
+            ;;
+        --skip-npm)
+            SKIP_NPM=true
+            shift
+            ;;
+        --backend-only)
+            BACKEND_ONLY=true
+            shift
+            ;;
+        --help)
+            echo "Użycie: $0 [opcje]"
+            echo "Opcje:"
+            echo "  --skip-build    Pomiń budowanie frontendu (użyj gdy tylko backend się zmienił)"
+            echo "  --skip-npm      Pomiń instalację pakietów npm"
+            echo "  --backend-only  Tylko restart backendu (najszybsze)"
+            echo ""
+            echo "Przykłady:"
+            echo "  $0                    # Pełny deploy"
+            echo "  $0 --skip-build       # Bez budowania frontendu"
+            echo "  $0 --backend-only     # Tylko restart backendu"
+            exit 0
+            ;;
+        *)
+            echo "Nieznana opcja: $1"
+            exit 1
+            ;;
+    esac
+done
+
 echo "=== Szybki redeploy WiFi Kiosk ==="
+if [ "$SKIP_BUILD" = true ]; then
+    echo "    (pomijam budowanie frontendu)"
+fi
+if [ "$SKIP_NPM" = true ]; then
+    echo "    (pomijam instalację pakietów)"
+fi
+if [ "$BACKEND_ONLY" = true ]; then
+    echo "    (tylko restart backendu)"
+fi
 echo ""
 
 # Sprawdź czy jesteśmy w katalogu projektu
@@ -15,35 +63,48 @@ fi
 echo "1. Aktualizacja kodu z git..."
 git pull origin main
 
-echo "2. Aktualizacja zależności backend..."
-cd backend
-if [ -f "package.json" ]; then
-    npm install --production
+if [ "$BACKEND_ONLY" = false ]; then
+    echo "2. Aktualizacja zależności backend..."
+    cd backend
+    if [ "$SKIP_NPM" = false ] && [ -f "package.json" ]; then
+        npm install --production
+    else
+        echo "   (pomijam npm install)"
+    fi
+    cd ..
+
+    if [ "$SKIP_BUILD" = false ]; then
+        echo "3. Rebuild frontendu..."
+        cd frontend
+
+        # Sprawdź czy jest build
+        if [ ! -d "build" ]; then
+            echo "Brak build/ - instaluję zależności..."
+            if [ "$SKIP_NPM" = false ]; then
+                npm install
+            fi
+        fi
+
+        # Dodaj web-vitals jeśli brakuje
+        if [ "$SKIP_NPM" = false ] && ! grep -q "web-vitals" package.json; then
+            npm install web-vitals --save
+        fi
+
+        # Build z ograniczeniem pamięci
+        export NODE_OPTIONS="--max-old-space-size=512"
+        export GENERATE_SOURCEMAP=false
+        echo "Budowanie React app..."
+        npm run build
+        unset NODE_OPTIONS
+
+        cd ..
+    else
+        echo "3. Pomijam rebuild frontendu"
+    fi
+else
+    echo "2. Pomijam aktualizację zależności (tylko backend)"
+    echo "3. Pomijam rebuild frontendu (tylko backend)"
 fi
-cd ..
-
-echo "3. Rebuild frontendu..."
-cd frontend
-
-# Sprawdź czy jest build
-if [ ! -d "build" ]; then
-    echo "Brak build/ - instaluję zależności..."
-    npm install
-fi
-
-# Dodaj web-vitals jeśli brakuje
-if ! grep -q "web-vitals" package.json; then
-    npm install web-vitals --save
-fi
-
-# Build z ograniczeniem pamięci
-export NODE_OPTIONS="--max-old-space-size=512"
-export GENERATE_SOURCEMAP=false
-echo "Budowanie React app..."
-npm run build
-unset NODE_OPTIONS
-
-cd ..
 
 echo "4. Restart services..."
 sudo systemctl restart wifi-kiosk-backend
