@@ -18,24 +18,43 @@ let hotspotInfo = null;
 // Funkcja sprawdzająca stan WiFi
 const checkWifiStatus = () => {
   try {
-    // Sprawdź czy interfejs wlan0 ma adres IP (jest połączony)
-    const result = execSync("ip addr show wlan0 | grep 'inet ' | awk '{print $2}'", { encoding: 'utf8' });
-    if (result.trim()) {
-      console.log("WiFi już połączone, ustawiam tryb 'connected'");
-      currentMode = "connected";
-      return true;
+    // Sprawdź czy wpa_supplicant jest aktywny i połączony
+    const wpaStatus = execSync("wpa_cli -i wlan0 status 2>/dev/null | grep wpa_state", { encoding: 'utf8' });
+    console.log("WPA Status:", wpaStatus.trim());
+    
+    if (wpaStatus.includes('wpa_state=COMPLETED')) {
+      // Dodatkowo sprawdź czy mamy adres IP
+      const ipResult = execSync("ip addr show wlan0 | grep 'inet ' | awk '{print $2}'", { encoding: 'utf8' });
+      console.log("IP Address:", ipResult.trim());
+      
+      if (ipResult.trim()) {
+        console.log("WiFi już połączone (WPA completed + IP assigned), ustawiam tryb 'connected'");
+        currentMode = "connected";
+        return true;
+      }
     }
+    
+    console.log("WiFi nie jest w pełni połączone, pozostaję w trybie init");
   } catch (error) {
-    console.log("Nie udało się sprawdzić stanu WiFi, pozostaję w trybie init");
+    console.log("Nie udało się sprawdzić stanu WiFi:", error.message);
   }
   return false;
 };
 
-// Sprawdź stan WiFi przy starcie
-checkWifiStatus();
+// Sprawdź stan WiFi przy starcie z opóźnieniem
+setTimeout(() => {
+  console.log("Sprawdzanie stanu WiFi po starcie...");
+  checkWifiStatus();
+}, 3000); // 3 sekundy opóźnienia
 
 // Endpoint do sprawdzania statusu
 app.get("/api/status", (req, res) => {
+  // Jeśli tryb to init, sprawdź ponownie stan WiFi
+  if (currentMode === "init") {
+    console.log("Tryb init - sprawdzam ponownie stan WiFi...");
+    checkWifiStatus();
+  }
+  
   res.json({ 
     mode: currentMode,
     hotspotInfo: hotspotInfo 
