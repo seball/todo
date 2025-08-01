@@ -15,6 +15,25 @@ app.use(express.static(path.join(__dirname, "../frontend/build")));
 let currentMode = "init"; // init, hotspot, connected
 let hotspotInfo = null;
 
+// Funkcja sprawdzająca stan WiFi
+const checkWifiStatus = () => {
+  try {
+    // Sprawdź czy interfejs wlan0 ma adres IP (jest połączony)
+    const result = execSync("ip addr show wlan0 | grep 'inet ' | awk '{print $2}'", { encoding: 'utf8' });
+    if (result.trim()) {
+      console.log("WiFi już połączone, ustawiam tryb 'connected'");
+      currentMode = "connected";
+      return true;
+    }
+  } catch (error) {
+    console.log("Nie udało się sprawdzić stanu WiFi, pozostaję w trybie init");
+  }
+  return false;
+};
+
+// Sprawdź stan WiFi przy starcie
+checkWifiStatus();
+
 // Endpoint do sprawdzania statusu
 app.get("/api/status", (req, res) => {
   res.json({ 
@@ -223,6 +242,14 @@ network={
     if (err) return res.status(500).send("Błąd połączenia");
     res.send("Połączono z siecią Wi-Fi");
   });
+});
+
+// Endpoint do resetowania na tryb hotspot (jeśli chcemy zmienić sieć)
+app.post("/api/reset-to-hotspot", (req, res) => {
+  console.log("Resetowanie do trybu hotspot...");
+  currentMode = "init";
+  hotspotInfo = null;
+  res.json({ success: true, message: "Reset do trybu hotspot" });
 });
 
 // Dla React Router - wszystkie inne ścieżki zwracają index.html

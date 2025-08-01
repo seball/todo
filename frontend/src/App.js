@@ -129,6 +129,9 @@ function App() {
               <li>Połącz się z siecią WiFi</li>
               <li>Otwórz przeglądarkę na 192.168.4.1</li>
             </ol>
+            <button onClick={scanNetworks} style={{ marginTop: '20px' }}>
+              Konfiguruj WiFi
+            </button>
           </div>
         </div>
       </div>
@@ -166,11 +169,24 @@ function App() {
     );
   }
 
+  const resetToHotspot = async () => {
+    try {
+      await fetch('/api/reset-to-hotspot', { method: 'POST' });
+      setMode('loading');
+      checkStatus();
+    } catch (err) {
+      console.error('Błąd resetowania:', err);
+    }
+  };
+
   if (mode === 'connected') {
     return (
       <div className="App">
         <h1>Połączono z WiFi!</h1>
         <p>Urządzenie jest teraz połączone z internetem.</p>
+        <button onClick={resetToHotspot} style={{ marginTop: '20px', background: 'rgba(250, 245, 240, 0.1)', border: '1px solid rgba(250, 245, 240, 0.3)' }}>
+          Zmień sieć WiFi
+        </button>
       </div>
     );
   }
