@@ -165,12 +165,37 @@ app.get("/api/scan-wifi", (req, res) => {
   });
 });
 
+// Funkcja walidacji hasła WiFi
+const validateWifiPassword = (password) => {
+  if (!password) return "Hasło jest wymagane";
+  if (password.length < 8) return "Hasło musi mieć co najmniej 8 znaków";
+  if (password.length > 63) return "Hasło nie może być dłuższe niż 63 znaki";
+  
+  // Sprawdź znaki ASCII (20-126)
+  if (!/^[\x20-\x7E]*$/.test(password)) {
+    return "Hasło zawiera niedozwolone znaki";
+  }
+  
+  // Sprawdź czy nie zawiera cudzysłowów (problematyczne w konfiguracji)
+  if (password.includes('"') || password.includes("'")) {
+    return "Hasło nie może zawierać cudzysłowów";
+  }
+  
+  return null;
+};
+
 // Endpoint do łączenia z WiFi
 app.post("/api/connect-wifi", (req, res) => {
   const { ssid, password } = req.body;
   
-  if (!ssid || !password) {
-    return res.status(400).json({ error: "Brak SSID lub hasła" });
+  if (!ssid) {
+    return res.status(400).json({ error: "SSID jest wymagane" });
+  }
+  
+  // Walidacja hasła
+  const passwordError = validateWifiPassword(password);
+  if (passwordError) {
+    return res.status(400).json({ error: passwordError });
   }
   
   // Prosty test - próbuj połączyć z timeout
@@ -233,9 +258,15 @@ app.post("/api/connect-wifi", (req, res) => {
         if (restoreErr) {
           console.error("Error restoring hotspot:", restoreErr);
         }
+        
+        // Przywróć stan aplikacji do trybu hotspot
+        currentMode = "hotspot";
+        
         res.status(400).json({ 
           error: "Nie udało się połączyć. Sprawdź SSID i hasło. Hotspot przywrócony.",
-          keepHotspot: true 
+          keepHotspot: true,
+          mode: "hotspot",
+          hotspotInfo: hotspotInfo
         });
       });
     }

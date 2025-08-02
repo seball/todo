@@ -304,10 +304,16 @@ button {
   transition: all 0.2s ease;
 }
 
-button:hover {
+button:hover:not(:disabled) {
   background: #fff;
   transform: translateY(-1px);
   box-shadow: 0 5px 15px rgba(250, 245, 240, 0.2);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 form {
@@ -361,6 +367,18 @@ select {
   padding: 10px;
   border-radius: 8px;
   border: 1px solid rgba(255, 107, 107, 0.2);
+}
+
+.info {
+  color: #4ecdc4;
+  margin: 10px 0;
+  font-weight: 500;
+  font-size: 13px;
+  text-align: center;
+  background: rgba(78, 205, 196, 0.1);
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(78, 205, 196, 0.2);
 }
 
 /* Dodatkowe style dla lepszej czytelności na małym ekranie */
@@ -420,4 +438,63 @@ select {
 .grid-toggle:hover {
   background: #ff0000;
   color: white;
+}
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(250, 245, 240, 0.3);
+  border-radius: 50%;
+  border-top-color: #faf5f0;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 10px;
+}
+
+.spinner-large {
+  width: 40px;
+  height: 40px;
+  border-width: 3px;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.connecting-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(5, 5, 5, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+  color: #faf5f0;
+}
+
+.connecting-content {
+  text-align: center;
+  background: rgba(250, 245, 240, 0.05);
+  padding: 40px;
+  border-radius: 20px;
+  border: 1px solid rgba(250, 245, 240, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.connecting-content h2 {
+  margin-bottom: 20px;
+  font-weight: 300;
+  font-size: 22px;
+}
+
+.connecting-content p {
+  margin-bottom: 20px;
+  opacity: 0.8;
+  font-size: 14px;
 }
