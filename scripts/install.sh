@@ -38,18 +38,12 @@ echo "Zainstalowane wersje:"
 node --version
 npm --version
 
-# Instalacja pakietów dla hotspota
-sudo apt install -y hostapd dnsmasq wireless-tools wpasupplicant
-
-# Zatrzymaj usługi które będą zarządzane przez aplikację
-sudo systemctl stop hostapd 2>/dev/null || true
-sudo systemctl stop dnsmasq 2>/dev/null || true
-sudo systemctl disable hostapd 2>/dev/null || true
-sudo systemctl disable dnsmasq 2>/dev/null || true
+# Instalacja NetworkManager
+sudo apt install -y network-manager wireless-tools
 
 # Instalacja zależności backend
 cd backend
-npm install express body-parser
+npm install
 
 # Budowanie frontendu React
 cd ../frontend

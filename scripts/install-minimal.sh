@@ -83,17 +83,11 @@ echo "Zainstalowane wersje:"
 node --version
 npm --version
 
-# Pakiety WiFi
-echo "7/8 Instalacja pakietów WiFi..."
+# NetworkManager
+echo "7/8 Instalacja NetworkManager..."
 sudo apt install -y --no-install-recommends \
-    hostapd \
-    dnsmasq \
-    wireless-tools \
-    wpasupplicant
-
-# Wyłącz niepotrzebne services
-sudo systemctl stop hostapd dnsmasq 2>/dev/null || true
-sudo systemctl disable hostapd dnsmasq 2>/dev/null || true
+    network-manager \
+    wireless-tools
 
 # Instalacja zależności backend
 echo "8/9 Instalacja zależności backend..."

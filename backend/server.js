@@ -1,8 +1,9 @@
 const express = require("express");
 const bodyParser = require("body-parser");
-const fs = require("fs");
 const { exec, execSync } = require("child_process");
 const path = require("path");
+const { promisify } = require('util');
+const execAsync = promisify(exec);
 
 const app = express();
 app.use(bodyParser.json());
@@ -15,44 +16,50 @@ app.use(express.static(path.join(__dirname, "../frontend/build")));
 let currentMode = "init"; // init, hotspot, connected
 let hotspotInfo = null;
 
-// Funkcja sprawdzająca stan WiFi
-const checkWifiStatus = () => {
+// Funkcja sprawdzająca stan WiFi używając NetworkManager
+const checkWifiStatus = async () => {
   try {
-    // Sprawdź czy wpa_supplicant jest aktywny i połączony
-    const wpaStatus = execSync("wpa_cli -i wlan0 status 2>/dev/null | grep wpa_state", { encoding: 'utf8' });
-    console.log("WPA Status:", wpaStatus.trim());
+    // Sprawdź aktywne połączenia
+    const { stdout } = await execAsync("nmcli -t -f NAME,TYPE,DEVICE con show --active");
+    const connections = stdout.trim().split('\n');
     
-    if (wpaStatus.includes('wpa_state=COMPLETED')) {
-      // Dodatkowo sprawdź czy mamy adres IP
-      const ipResult = execSync("ip addr show wlan0 | grep 'inet ' | awk '{print $2}'", { encoding: 'utf8' });
-      console.log("IP Address:", ipResult.trim());
-      
-      if (ipResult.trim()) {
-        console.log("WiFi już połączone (WPA completed + IP assigned), ustawiam tryb 'connected'");
-        currentMode = "connected";
+    for (const conn of connections) {
+      const [name, type, device] = conn.split(':');
+      if (device === 'wlan0' && type === '802-11-wireless') {
+        // Sprawdź czy to AP czy klient
+        const { stdout: mode } = await execAsync(`nmcli -t -f 802-11-wireless.mode con show "${name}"`);
+        
+        if (mode.includes('ap')) {
+          currentMode = "hotspot";
+          // Pobierz dane hotspotu
+          const { stdout: ssid } = await execAsync(`nmcli -t -f 802-11-wireless.ssid con show "${name}"`);
+          const { stdout: psk } = await execAsync(`nmcli -t -f 802-11-wireless-security.psk con show "${name}"`);
+          hotspotInfo = {
+            ssid: ssid.split(':')[1]?.trim() || 'TodoAP',
+            password: psk.split(':')[1]?.trim() || 'todo12345678'
+          };
+        } else {
+          currentMode = "connected";
+        }
         return true;
       }
     }
-    
-    console.log("WiFi nie jest w pełni połączone, pozostaję w trybie init");
   } catch (error) {
     console.log("Nie udało się sprawdzić stanu WiFi:", error.message);
   }
   return false;
 };
 
-// Sprawdź stan WiFi przy starcie z opóźnieniem
-setTimeout(() => {
+// Sprawdź stan WiFi przy starcie
+setTimeout(async () => {
   console.log("Sprawdzanie stanu WiFi po starcie...");
-  checkWifiStatus();
-}, 3000); // 3 sekundy opóźnienia
+  await checkWifiStatus();
+}, 3000);
 
 // Endpoint do sprawdzania statusu
-app.get("/api/status", (req, res) => {
-  // Jeśli tryb to init, sprawdź ponownie stan WiFi
+app.get("/api/status", async (req, res) => {
   if (currentMode === "init") {
-    console.log("Tryb init - sprawdzam ponownie stan WiFi...");
-    checkWifiStatus();
+    await checkWifiStatus();
   }
   
   res.json({ 
@@ -61,253 +68,152 @@ app.get("/api/status", (req, res) => {
   });
 });
 
-// Endpoint do uruchamiania hotspota
+// Endpoint do uruchamiania hotspota z NetworkManager
 app.post("/api/start-hotspot", async (req, res) => {
   try {
     // Generuj losowe dane hotspota
     const ssid = `RaspberryPi-${Math.random().toString(36).substring(7)}`;
     const password = Math.random().toString(36).substring(2, 10);
     
-    // Konfiguracja hostapd
-    const hostapdConfig = `
-interface=wlan0
-driver=nl80211
-ssid=${ssid}
-hw_mode=g
-channel=7
-wmm_enabled=0
-macaddr_acl=0
-auth_algs=1
-ignore_broadcast_ssid=0
-wpa=2
-wpa_passphrase=${password}
-wpa_key_mgmt=WPA-PSK
-wpa_pairwise=TKIP
-rsn_pairwise=CCMP
-`;
-
-    // Konfiguracja dnsmasq
-    const dnsmasqConfig = `
-interface=wlan0
-dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
-domain=local
-address=/local/192.168.4.1
-`;
-
-    // Zapisz konfiguracje
-    fs.writeFileSync("/tmp/hostapd.conf", hostapdConfig);
-    fs.writeFileSync("/tmp/dnsmasq.conf", dnsmasqConfig);
+    // Usuń stare połączenie AP jeśli istnieje
+    try {
+      await execAsync('nmcli con delete "TodoAP" 2>/dev/null');
+    } catch (e) {
+      // Ignoruj błąd jeśli połączenie nie istnieje
+    }
     
-    // Przełącz w tryb AP
-    exec(`sudo bash -c '
-      systemctl stop wpa_supplicant
-      ip link set wlan0 down
-      ip addr flush dev wlan0
-      ip link set wlan0 up
-      ip addr add 192.168.4.1/24 dev wlan0
-      
-      # Uruchom hostapd i dnsmasq
-      killall hostapd dnsmasq 2>/dev/null || true
-      hostapd /tmp/hostapd.conf -B
-      dnsmasq -C /tmp/dnsmasq.conf
-      
-      # Włącz routing
-      echo 1 > /proc/sys/net/ipv4/ip_forward
-      iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-      iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
-      iptables -A FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT
-    '`, (err, stdout, stderr) => {
-      if (err) {
-        console.error("Błąd uruchamiania hotspota:", err);
-        return res.status(500).json({ error: "Nie można uruchomić hotspota" });
-      }
-      
-      currentMode = "hotspot";
-      hotspotInfo = { ssid, password };
-      res.json(hotspotInfo);
-    });
+    // Utwórz nowe połączenie AP
+    await execAsync(`nmcli con add type wifi ifname wlan0 con-name TodoAP autoconnect no ssid "${ssid}"`);
+    await execAsync('nmcli con modify TodoAP 802-11-wireless.mode ap');
+    await execAsync('nmcli con modify TodoAP 802-11-wireless.band bg');
+    await execAsync('nmcli con modify TodoAP ipv4.method shared');
+    await execAsync('nmcli con modify TodoAP ipv4.addresses 192.168.100.1/24');
+    await execAsync('nmcli con modify TodoAP wifi-sec.key-mgmt wpa-psk');
+    await execAsync(`nmcli con modify TodoAP wifi-sec.psk "${password}"`);
     
-  } catch (err) {
-    console.error("Błąd:", err);
-    res.status(500).json({ error: "Błąd serwera" });
+    // Aktywuj AP
+    await execAsync('nmcli con up TodoAP');
+    
+    currentMode = "hotspot";
+    hotspotInfo = { ssid, password };
+    res.json(hotspotInfo);
+    
+  } catch (error) {
+    console.error("Błąd uruchamiania hotspota:", error);
+    res.status(500).json({ error: "Nie można uruchomić hotspota" });
   }
 });
 
 // Endpoint do skanowania sieci WiFi
-app.get("/api/scan-wifi", (req, res) => {
-  exec("sudo iwlist wlan0 scan | grep -E 'ESSID:|Quality='", (err, stdout) => {
-    if (err) {
-      return res.status(500).json({ error: "Nie można zeskanować sieci" });
-    }
+app.get("/api/scan-networks", async (req, res) => {
+  try {
+    // Wymuś nowe skanowanie
+    await execAsync('nmcli dev wifi rescan');
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Poczekaj na wyniki
     
-    const lines = stdout.split("\n");
-    const networks = [];
+    // Pobierz listę sieci
+    const { stdout } = await execAsync('nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list');
+    const networks = stdout.trim().split('\n')
+      .filter(line => line)
+      .map(line => {
+        const [ssid, signal, security] = line.split(':');
+        return {
+          ssid,
+          signal: parseInt(signal),
+          security: security || 'Open'
+        };
+      })
+      .filter(net => net.ssid && net.ssid !== '--')
+      .sort((a, b) => b.signal - a.signal);
     
-    for (let i = 0; i < lines.length - 1; i += 2) {
-      const qualityMatch = lines[i].match(/Quality=(\d+)\/70/);
-      const ssidMatch = lines[i + 1].match(/ESSID:"(.+)"/);
-      
-      if (qualityMatch && ssidMatch) {
-        const signal = Math.round((parseInt(qualityMatch[1]) / 70) * 100);
-        networks.push({
-          ssid: ssidMatch[1],
-          signal: signal
-        });
-      }
-    }
-    
-    // Usuń duplikaty i posortuj po sile sygnału
-    const uniqueNetworks = networks.filter((net, index, self) =>
-      index === self.findIndex((n) => n.ssid === net.ssid)
-    ).sort((a, b) => b.signal - a.signal);
-    
-    res.json({ networks: uniqueNetworks });
-  });
+    res.json(networks);
+  } catch (error) {
+    console.error("Błąd skanowania sieci:", error);
+    res.status(500).json({ error: "Nie można zeskanować sieci" });
+  }
 });
 
-// Funkcja walidacji hasła WiFi
-const validateWifiPassword = (password) => {
-  if (!password) return "Hasło jest wymagane";
-  if (password.length < 8) return "Hasło musi mieć co najmniej 8 znaków";
-  if (password.length > 63) return "Hasło nie może być dłuższe niż 63 znaki";
-  
-  // Sprawdź znaki ASCII (20-126)
-  if (!/^[\x20-\x7E]*$/.test(password)) {
-    return "Hasło zawiera niedozwolone znaki";
-  }
-  
-  // Sprawdź czy nie zawiera cudzysłowów (problematyczne w konfiguracji)
-  if (password.includes('"') || password.includes("'")) {
-    return "Hasło nie może zawierać cudzysłowów";
-  }
-  
-  return null;
-};
-
-// Endpoint do łączenia z WiFi
-app.post("/api/connect-wifi", (req, res) => {
+// Endpoint do łączenia z siecią WiFi
+app.post("/api/connect-wifi", async (req, res) => {
   const { ssid, password } = req.body;
   
   if (!ssid) {
-    return res.status(400).json({ error: "SSID jest wymagane" });
+    return res.status(400).json({ error: "Brak SSID" });
   }
   
-  // Walidacja hasła
-  const passwordError = validateWifiPassword(password);
-  if (passwordError) {
-    return res.status(400).json({ error: passwordError });
-  }
-  
-  // Prosty test - próbuj połączyć z timeout
-  exec(`sudo bash -c '
-    # Zatrzymaj AP tymczasowo
-    killall hostapd dnsmasq 2>/dev/null || true
+  try {
+    // Wyłącz AP tymczasowo
+    await execAsync('nmcli con down TodoAP 2>/dev/null || true');
     
-    # Przywróć tryb klienta
-    ip addr flush dev wlan0
-    systemctl start wpa_supplicant
-    
-    # Skonfiguruj nową sieć
-    wpa_cli -i wlan0 remove_network all
-    NETWORK_ID=$(wpa_cli -i wlan0 add_network | tail -n 1)
-    wpa_cli -i wlan0 set_network $NETWORK_ID ssid \\"${ssid}\\"
-    wpa_cli -i wlan0 set_network $NETWORK_ID psk \\"${password}\\"
-    wpa_cli -i wlan0 enable_network $NETWORK_ID
-    wpa_cli -i wlan0 save_config
-    
-    # Poczekaj na połączenie - max 20 sekund
-    for i in {1..20}; do
-      if wpa_cli -i wlan0 status | grep -q "wpa_state=COMPLETED"; then
-        echo "CONNECTION_SUCCESS"
-        exit 0
-      fi
-      sleep 1
-    done
-    
-    echo "CONNECTION_FAILED"
-    exit 1
-  '`, (err, stdout, stderr) => {
-    console.log("Connection attempt:", stdout, stderr);
-    
-    if (!err && stdout.includes("CONNECTION_SUCCESS")) {
-      // Sukces - połączono z nową siecią
-      currentMode = "connected";
-      res.json({ success: true, message: "Połączono z nową siecią WiFi" });
-    } else {
-      // Niepowodzenie - przywróć hotspot
-      console.log("Connection failed, restoring hotspot...");
-      
-      // Przywróć hotspot z tymi samymi danymi
-      exec(`sudo bash -c '
-        systemctl stop wpa_supplicant
-        ip link set wlan0 down
-        ip addr flush dev wlan0
-        ip link set wlan0 up
-        ip addr add 192.168.4.1/24 dev wlan0
-        
-        # Uruchom hostapd i dnsmasq ponownie
-        hostapd /tmp/hostapd.conf -B
-        dnsmasq -C /tmp/dnsmasq.conf
-        
-        # Włącz routing
-        echo 1 > /proc/sys/net/ipv4/ip_forward
-        iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || true
-        iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT 2>/dev/null || true
-        iptables -A FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
-      '`, (restoreErr) => {
-        if (restoreErr) {
-          console.error("Error restoring hotspot:", restoreErr);
-        }
-        
-        // Przywróć stan aplikacji do trybu hotspot
-        currentMode = "hotspot";
-        
-        res.status(400).json({ 
-          error: "Nie udało się połączyć. Sprawdź SSID i hasło. Hotspot przywrócony.",
-          keepHotspot: true,
-          mode: "hotspot",
-          hotspotInfo: hotspotInfo
-        });
-      });
+    // Usuń stare połączenie jeśli istnieje
+    try {
+      await execAsync(`nmcli con delete "${ssid}" 2>/dev/null`);
+    } catch (e) {
+      // Ignoruj błąd
     }
-  });
+    
+    // Utwórz nowe połączenie
+    if (password) {
+      await execAsync(`nmcli dev wifi connect "${ssid}" password "${password}" ifname wlan0`);
+    } else {
+      await execAsync(`nmcli dev wifi connect "${ssid}" ifname wlan0`);
+    }
+    
+    // Poczekaj na połączenie
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    // Sprawdź czy połączono
+    const { stdout } = await execAsync('nmcli -t -f STATE,CONNECTION dev show wlan0');
+    
+    if (stdout.includes('connected') && !stdout.includes('TodoAP')) {
+      currentMode = "connected";
+      res.json({ success: true, message: "Połączono z siecią WiFi" });
+    } else {
+      throw new Error("Połączenie nieudane");
+    }
+    
+  } catch (error) {
+    console.error("Błąd łączenia:", error);
+    
+    // Przywróć AP
+    try {
+      await execAsync('nmcli con up TodoAP');
+      currentMode = "hotspot";
+    } catch (e) {
+      console.error("Błąd przywracania AP:", e);
+    }
+    
+    res.status(400).json({ 
+      error: "Nie udało się połączyć. Sprawdź hasło.",
+      keepHotspot: true,
+      mode: "hotspot",
+      hotspotInfo: hotspotInfo
+    });
+  }
 });
 
-// Stara funkcjonalność dla kompatybilności
-app.post("/connect", (req, res) => {
-  const { ssid, password } = req.body;
-  const config = `
-interface wlan0
-static ip_address=192.168.1.100/24
-static routers=192.168.1.1
-static domain_name_servers=192.168.1.1 8.8.8.8
-
-network={
-  ssid="${ssid}"
-  psk="${password}"
-}`;
-  
-  fs.writeFileSync("/etc/dhcpcd.conf", config);
-  exec("sudo systemctl restart dhcpcd", (err) => {
-    if (err) return res.status(500).send("Błąd połączenia");
-    res.send("Połączono z siecią Wi-Fi");
-  });
+// Endpoint do resetowania na tryb hotspot
+app.post("/api/reset-to-hotspot", async (req, res) => {
+  try {
+    // Rozłącz obecne połączenie
+    await execAsync('nmcli dev disconnect wlan0 2>/dev/null || true');
+    
+    // Aktywuj AP
+    await execAsync('nmcli con up TodoAP');
+    
+    currentMode = "hotspot";
+    res.json({ success: true, message: "Reset do trybu hotspot" });
+  } catch (error) {
+    res.status(500).json({ error: "Błąd resetowania" });
+  }
 });
 
-// Endpoint do resetowania na tryb hotspot (jeśli chcemy zmienić sieć)
-app.post("/api/reset-to-hotspot", (req, res) => {
-  console.log("Resetowanie do trybu hotspot...");
-  currentMode = "init";
-  hotspotInfo = null;
-  res.json({ success: true, message: "Reset do trybu hotspot" });
+// Catch-all dla React Router
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
 });
 
-// Dla React Router - wszystkie inne ścieżki zwracają index.html
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/build", "index.html"));
-});
-
-app.listen(80, () => {
-  console.log("Serwer działa na porcie 80");
-  console.log("Tryb kiosku WiFi aktywny");
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Serwer działa na porcie ${PORT}`);
 });

@@ -20,7 +20,6 @@ function App() {
   const [selectedNetwork, setSelectedNetwork] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
 
   useEffect(() => {
@@ -95,35 +94,12 @@ function App() {
     }
   };
 
-  const validatePassword = (password) => {
-    if (password.length < 8) {
-      return 'Hasło musi mieć co najmniej 8 znaków';
-    }
-    if (password.length > 63) {
-      return 'Hasło nie może być dłuższe niż 63 znaki';
-    }
-    // Sprawdź niedozwolone znaki
-    if (!/^[\x20-\x7E]*$/.test(password)) {
-      return 'Hasło zawiera niedozwolone znaki';
-    }
-    return null;
-  };
 
   const connectToWifi = async (e) => {
     e.preventDefault();
     setError('');
-    setInfo('');
     
-    // Walidacja hasła
-    const passwordError = validatePassword(password);
-    if (passwordError) {
-      setError(passwordError);
-      return;
-    }
-    
-    // Pokaż spinner i komunikat
     setIsConnecting(true);
-    setInfo('Łączenie z siecią... (może potrwać do 20 sekund)');
     
     try {
       const response = await fetch('/api/connect-wifi', {
@@ -135,13 +111,11 @@ function App() {
       if (response.ok) {
         setMode('connected');
         setError('');
-        setInfo('');
-        setIsConnecting(false);
+                setIsConnecting(false);
       } else {
         const data = await response.json();
         setError(data.error || 'Błąd połączenia');
-        setInfo('');
-        setIsConnecting(false);
+                setIsConnecting(false);
         
         // Jeśli backend przywrócił hotspot, zaktualizuj stan
         if (data.keepHotspot && data.mode === 'hotspot') {
@@ -154,17 +128,11 @@ function App() {
               generateQRCode(data.hotspotInfo.ssid, data.hotspotInfo.password);
             }, 100);
           }
-          // Pokaż info o powrocie do trybu AP
-          setTimeout(() => {
-            setError('');
-            setInfo('Powrócono do trybu Access Point. Możesz spróbować ponownie.');
-          }, 2000);
         }
       }
     } catch (err) {
       setError('Błąd połączenia z siecią');
-      setInfo('');
-      setIsConnecting(false);
+            setIsConnecting(false);
     }
   };
 
@@ -180,8 +148,7 @@ function App() {
     return (
       <div className="App">
         <h1>Konfiguracja WiFi</h1>
-        {info && <p className="info">{info}</p>}
-        <div className="hotspot-info">
+                <div className="hotspot-info">
           <div className="qr-section">
             <div className="qr-code">
               <canvas id="qr-code"></canvas>
@@ -195,7 +162,7 @@ function App() {
               <li>Otwórz przeglądarkę na 192.168.4.1</li>
             </ol>
             <button onClick={scanNetworks} style={{ marginTop: '20px' }}>
-              {info && info.includes('ponownie') ? 'Spróbuj ponownie' : 'Konfiguruj WiFi'}
+              Konfiguruj WiFi
             </button>
           </div>
         </div>
@@ -210,8 +177,7 @@ function App() {
         <div className="App">
           <h1>Wybierz sieć WiFi</h1>
           {error && <p className="error">{error}</p>}
-          {info && <p className="info">{info}</p>}
-          <form onSubmit={connectToWifi}>
+                    <form onSubmit={connectToWifi}>
           <select 
             value={selectedNetwork} 
             onChange={(e) => setSelectedNetwork(e.target.value)}
@@ -238,20 +204,7 @@ function App() {
             required
             minLength="8"
             maxLength="63"
-            style={{
-              borderColor: password && validatePassword(password) ? '#ff6b6b' : 'rgba(250, 245, 240, 0.2)'
-            }}
           />
-          {password && validatePassword(password) && (
-            <p style={{ 
-              color: '#ff6b6b', 
-              fontSize: '11px', 
-              margin: '5px 0 0 0',
-              textAlign: 'left'
-            }}>
-              {validatePassword(password)}
-            </p>
-          )}
           <button type="submit" disabled={isConnecting}>
             {isConnecting ? (
               <>

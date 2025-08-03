@@ -79,18 +79,14 @@ echo "Zainstalowane wersje:"
 node --version
 npm --version
 
-# Zainstaluj pakiety WiFi
-echo "5/8 Instalacja pakietów WiFi..."
-sudo apt install -y hostapd dnsmasq wireless-tools wpasupplicant
-
-# Zatrzymaj usługi które będą zarządzane przez aplikację
-sudo systemctl stop hostapd dnsmasq 2>/dev/null || true
-sudo systemctl disable hostapd dnsmasq 2>/dev/null || true
+# Zainstaluj NetworkManager
+echo "5/8 Instalacja NetworkManager..."
+sudo apt install -y network-manager wireless-tools
 
 # Instalacja zależności backend
 echo "6/8 Instalacja zależności Node.js..."
 cd backend
-npm install express body-parser
+npm install
 cd ..
 
 # Budowanie frontendu React
