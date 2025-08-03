@@ -99,12 +99,29 @@ function App() {
 
   const scanNetworks = async () => {
     setMode('configuring');
+    setError('');
     try {
+      console.log('[FRONTEND] Rozpoczynam skanowanie sieci...');
       const response = await fetch('/api/scan-networks');
+      console.log('[FRONTEND] Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const data = await response.json();
-      setNetworks(data.networks);
+      console.log('[FRONTEND] Otrzymane dane:', data);
+      
+      if (data.networks && Array.isArray(data.networks)) {
+        setNetworks(data.networks);
+        console.log(`[FRONTEND] Ustawiono ${data.networks.length} sieci`);
+      } else {
+        console.error('[FRONTEND] Nieprawidłowy format danych:', data);
+        setError('Nieprawidłowy format danych z serwera');
+      }
     } catch (err) {
-      setError('Nie można zeskanować sieci');
+      console.error('[FRONTEND] Błąd skanowania:', err);
+      setError(`Nie można zeskanować sieci: ${err.message}`);
     }
   };
 
