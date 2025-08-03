@@ -21,10 +21,24 @@ function App() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isKiosk, setIsKiosk] = useState(false);
 
   useEffect(() => {
     checkStatus();
+    detectDevice();
   }, []);
+
+  const detectDevice = () => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isMobileDevice = /android|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(userAgent);
+    const isRaspberryPi = window.location.hostname === '192.168.100.1' || 
+                          window.location.hostname === 'localhost' ||
+                          window.location.hostname === '127.0.0.1';
+    
+    setIsMobile(isMobileDevice);
+    setIsKiosk(isRaspberryPi && !isMobileDevice);
+  };
 
   const checkStatus = async () => {
     try {
@@ -145,14 +159,48 @@ function App() {
   }
 
   if (mode === 'hotspot' && hotspotInfo) {
-    return (
-      <div className="App">
-        <h1>Konfiguracja WiFi</h1>
-        <div className="connection-details">
-          <h3>Dane połączenia:</h3>
-          <p><strong>Sieć:</strong> {hotspotInfo.ssid}</p>
-          <p><strong>Hasło:</strong> {hotspotInfo.password}</p>
+    // Widok mobilny - od razu pokaz konfiguracje
+    if (isMobile) {
+      return (
+        <div className="App mobile-view">
+          <h1>📶 Konfiguracja WiFi</h1>
+          <div className="mobile-info">
+            <p className="success-message">
+              ✓ Połączono z urządzeniem!<br/>
+              Wybierz sieć WiFi do połączenia z internetem:
+            </p>
+          </div>
+          <button 
+            onClick={scanNetworks} 
+            className="mobile-scan-btn"
+            style={{ 
+              fontSize: '18px',
+              padding: '15px 30px',
+              margin: '20px 0',
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              width: '100%',
+              maxWidth: '300px'
+            }}
+          >
+            🔍 Wybierz sieć WiFi
+          </button>
+          <div className="mobile-device-info">
+            <p style={{ fontSize: '12px', color: '#666', marginTop: '20px' }}>
+              Sieć: {hotspotInfo.ssid} | Hasło: {hotspotInfo.password}
+            </p>
+          </div>
         </div>
+      );
+    }
+    
+    // Widok kiosk - pokaż QR i instrukcje
+    return (
+      <div className="App kiosk-view">
+        <h1>Konfiguracja WiFi</h1>
         <div className="hotspot-info">
           <div className="qr-section">
             <div className="qr-code">
@@ -167,9 +215,6 @@ function App() {
               <li>Hasło: <strong>{hotspotInfo.password}</strong></li>
               <li>Otwórz przeglądarkę na <strong>192.168.100.1</strong></li>
             </ol>
-            <button onClick={scanNetworks} style={{ marginTop: '20px' }}>
-              Skonfiguruj połączenie z internetem
-            </button>
           </div>
         </div>
       </div>
@@ -177,51 +222,94 @@ function App() {
   }
 
   if (mode === 'configuring') {
+    const formStyle = isMobile ? {
+      padding: '10px',
+      maxWidth: '100%'
+    } : {};
+    
+    const selectStyle = isMobile ? {
+      fontSize: '16px',
+      padding: '12px',
+      marginBottom: '15px',
+      width: '100%',
+      borderRadius: '8px',
+      border: '2px solid #ddd'
+    } : {};
+    
+    const inputStyle = isMobile ? {
+      fontSize: '16px',
+      padding: '12px',
+      marginBottom: '15px',
+      width: '100%',
+      borderRadius: '8px',
+      border: '2px solid #ddd'
+    } : {};
+    
+    const buttonStyle = isMobile ? {
+      fontSize: '18px',
+      padding: '15px 30px',
+      width: '100%',
+      borderRadius: '8px',
+      backgroundColor: isConnecting ? '#ccc' : '#4CAF50',
+      color: 'white',
+      border: 'none',
+      cursor: isConnecting ? 'not-allowed' : 'pointer'
+    } : {};
+    
     return (
       <>
         {isConnecting && <ConnectingOverlay selectedNetwork={selectedNetwork} />}
-        <div className="App">
-          <h1>Wybierz sieć WiFi</h1>
+        <div className={`App ${isMobile ? 'mobile-view' : 'kiosk-view'}`}>
+          <h1>{isMobile ? '📶 Wybierz WiFi' : 'Wybierz sieć WiFi'}</h1>
           {error && <p className="error">{error}</p>}
-                    <form onSubmit={connectToWifi}>
-          <select 
-            value={selectedNetwork} 
-            onChange={(e) => setSelectedNetwork(e.target.value)}
-            required
-          >
-            <option value="">Wybierz sieć</option>
-            {networks.map(network => (
-              <option key={network.ssid} value={network.ssid}>
-                {network.ssid} ({network.signal}%)
-              </option>
-            ))}
-          </select>
-          <input
-            type="password"
-            placeholder="Hasło WiFi (min. 8 znaków)"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              // Wyczyść błędy przy zmianie hasła
-              if (error && error.includes('Hasło')) {
-                setError('');
-              }
-            }}
-            required
-            minLength="8"
-            maxLength="63"
-          />
-          <button type="submit" disabled={isConnecting}>
-            {isConnecting ? (
-              <>
-                <span className="spinner"></span>
-                Łączenie...
-              </>
-            ) : (
-              'Połącz'
-            )}
-          </button>
-        </form>
+          {isMobile && (
+            <p style={{ fontSize: '14px', color: '#666', marginBottom: '20px' }}>
+              Wybierz sieć WiFi i wprowadź hasło aby połączyć urządzenie z internetem:
+            </p>
+          )}
+          <form onSubmit={connectToWifi} style={formStyle}>
+            <select 
+              value={selectedNetwork} 
+              onChange={(e) => setSelectedNetwork(e.target.value)}
+              required
+              style={selectStyle}
+            >
+              <option value="">Wybierz sieć</option>
+              {networks.map(network => (
+                <option key={network.ssid} value={network.ssid}>
+                  {isMobile ? 
+                    `${network.ssid} (${network.signal}%)` :
+                    `${network.ssid} ({network.signal}%)`
+                  }
+                </option>
+              ))}
+            </select>
+            <input
+              type="password"
+              placeholder={isMobile ? "Hasło WiFi" : "Hasło WiFi (min. 8 znaków)"}
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (error && error.includes('Hasło')) {
+                  setError('');
+                }
+              }}
+              required
+              minLength="8"
+              maxLength="63"
+              style={inputStyle}
+            />
+            <button type="submit" disabled={isConnecting} style={buttonStyle}>
+              {isConnecting ? (
+                <>
+                  <span className="spinner"></span>
+                  {isMobile ? ' Łączenie...' : 'Łączenie...'}
+                </>
+              ) : (
+                isMobile ? '🔗 Połącz z internetem' : 'Połącz'
+              )}
+            </button>
+          </form>
         </div>
       </>
     );
@@ -239,11 +327,40 @@ function App() {
 
   if (mode === 'connected') {
     return (
-      <div className="App">
-        <h1>Połączono z WiFi!</h1>
-        <p>Urządzenie jest teraz połączone z internetem.</p>
-        <button onClick={resetToHotspot} style={{ marginTop: '20px', background: 'rgba(250, 245, 240, 0.1)', border: '1px solid rgba(250, 245, 240, 0.3)' }}>
-          Zmień sieć WiFi
+      <div className={`App ${isMobile ? 'mobile-view' : 'kiosk-view'}`}>
+        <h1>{isMobile ? '✓ Połączono!' : 'Połączono z WiFi!'}</h1>
+        <p style={isMobile ? { fontSize: '16px', color: '#4CAF50', fontWeight: 'bold' } : {}}>
+          {isMobile ? 
+            'Urządzenie ma dostęp do internetu 🌐' :
+            'Urządzenie jest teraz połączone z internetem.'
+          }
+        </p>
+        {isMobile && (
+          <div style={{ margin: '20px 0', padding: '15px', backgroundColor: '#e8f5e8', borderRadius: '8px' }}>
+            <p style={{ margin: 0, fontSize: '14px' }}>
+              🎉 Konfiguracja zakończona pomyślnie!<br/>
+              Możesz teraz zamknąć tę stronę.
+            </p>
+          </div>
+        )}
+        <button 
+          onClick={resetToHotspot} 
+          style={isMobile ? {
+            marginTop: '30px',
+            fontSize: '16px',
+            padding: '12px 24px',
+            backgroundColor: '#ff9800',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer'
+          } : {
+            marginTop: '20px', 
+            background: 'rgba(250, 245, 240, 0.1)', 
+            border: '1px solid rgba(250, 245, 240, 0.3)'
+          }}
+        >
+          {isMobile ? '🔄 Zmień sieć' : 'Zmień sieć WiFi'}
         </button>
       </div>
     );

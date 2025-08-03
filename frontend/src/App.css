@@ -1,4 +1,4 @@
-/* Modern dark layout dla 320x480 ekran */
+/* Modern responsive layout - kiosk i mobile */
 * {
   margin: 0;
   padding: 0;
@@ -497,4 +497,123 @@ select {
   margin-bottom: 20px;
   opacity: 0.8;
   font-size: 14px;
+}
+
+/* Mobile responsive styles */
+@media screen and (max-width: 768px) {
+  .mobile-view {
+    position: static !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    padding: 20px !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-sizing: border-box;
+  }
+  
+  .mobile-view h1 {
+    font-size: 24px;
+    margin-bottom: 20px;
+    text-align: center;
+    color: white;
+  }
+  
+  .mobile-info {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(10px);
+  }
+  
+  .success-message {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.4;
+    text-align: center;
+  }
+  
+  .mobile-scan-btn {
+    font-size: 18px !important;
+    padding: 15px 30px !important;
+    margin: 20px auto !important;
+    display: block !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+  }
+  
+  .mobile-scan-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  }
+  
+  .mobile-device-info {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+    backdrop-filter: blur(5px);
+  }
+}
+
+/* Kiosk view - preserve original styling */
+.kiosk-view {
+  position: absolute;
+  top: 0;
+  width: 480px;
+  height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #050505;
+  color: #faf5f0;
+  overflow: hidden;
+  padding: 30px;
+  transition: left 0.3s ease;
+}
+
+/* Mobile form improvements */
+@media screen and (max-width: 768px) {
+  .mobile-view form {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+  
+  .mobile-view select,
+  .mobile-view input {
+    width: 100% !important;
+    font-size: 16px !important;
+    padding: 15px !important;
+    margin-bottom: 15px !important;
+    border: none !important;
+    border-radius: 12px !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #333 !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+  
+  .mobile-view button[type="submit"] {
+    width: 100% !important;
+    font-size: 18px !important;
+    padding: 15px !important;
+    border: none !important;
+    border-radius: 12px !important;
+    background: #4CAF50 !important;
+    color: white !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+  }
+  
+  .mobile-view .error {
+    background: rgba(255, 82, 82, 0.1);
+    border: 1px solid rgba(255, 82, 82, 0.3);
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    text-align: center;
+    color: #ff5252;
+  }
 }
