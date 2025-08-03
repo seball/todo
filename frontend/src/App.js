@@ -86,7 +86,7 @@ function App() {
   const scanNetworks = async () => {
     setMode('configuring');
     try {
-      const response = await fetch('/api/scan-wifi');
+      const response = await fetch('/api/scan-networks');
       const data = await response.json();
       setNetworks(data.networks);
     } catch (err) {
