@@ -71,9 +71,9 @@ app.post("/api/start-hotspot", async (req, res) => {
   console.log("[START-HOTSPOT] Rozpoczynam tworzenie hotspota...");
   
   try {
-    // Generuj losowe dane hotspota
-    const ssid = `RaspberryPi-${Math.random().toString(36).substring(7)}`;
-    const password = Math.random().toString(36).substring(2, 10);
+    // Używaj stałej nazwy SSID
+    const ssid = `TOMAK69`;
+    const password = "tomak12345";
     console.log(`[START-HOTSPOT] SSID: ${ssid}, Password: ${password}`);
     
     // Sprawdź obecny stan
