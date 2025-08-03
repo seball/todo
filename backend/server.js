@@ -68,37 +68,62 @@ app.get("/api/status", async (req, res) => {
 
 // Endpoint do uruchamiania hotspota z NetworkManager
 app.post("/api/start-hotspot", async (req, res) => {
+  console.log("[START-HOTSPOT] Rozpoczynam tworzenie hotspota...");
+  
   try {
     // Generuj losowe dane hotspota
     const ssid = `RaspberryPi-${Math.random().toString(36).substring(7)}`;
     const password = Math.random().toString(36).substring(2, 10);
+    console.log(`[START-HOTSPOT] SSID: ${ssid}, Password: ${password}`);
+    
+    // Sprawdź obecny stan
+    console.log("[START-HOTSPOT] Sprawdzam obecne połączenia...");
+    const { stdout: currentCons } = await execAsync('nmcli con show');
+    console.log("[START-HOTSPOT] Połączenia:", currentCons);
     
     // Usuń stare połączenie AP jeśli istnieje
     try {
-      await execAsync('nmcli con delete "TodoAP" 2>/dev/null');
+      console.log("[START-HOTSPOT] Usuwam stare TodoAP...");
+      await execAsync('nmcli con delete "TodoAP"');
+      console.log("[START-HOTSPOT] Stare TodoAP usunięte");
     } catch (e) {
-      // Ignoruj błąd jeśli połączenie nie istnieje
+      console.log("[START-HOTSPOT] TodoAP nie istniało (OK)");
     }
     
     // Utwórz nowe połączenie AP
-    await execAsync(`nmcli con add type wifi ifname wlan0 con-name TodoAP autoconnect no ssid "${ssid}"`);
+    console.log("[START-HOTSPOT] Tworzę nowe połączenie AP...");
+    const { stdout: addResult } = await execAsync(`nmcli con add type wifi ifname wlan0 con-name TodoAP autoconnect no ssid "${ssid}"`);
+    console.log("[START-HOTSPOT] Add result:", addResult);
+    
+    console.log("[START-HOTSPOT] Konfiguruję parametry AP...");
     await execAsync('nmcli con modify TodoAP 802-11-wireless.mode ap');
     await execAsync('nmcli con modify TodoAP 802-11-wireless.band bg');
     await execAsync('nmcli con modify TodoAP ipv4.method shared');
     await execAsync('nmcli con modify TodoAP ipv4.addresses 192.168.100.1/24');
     await execAsync('nmcli con modify TodoAP wifi-sec.key-mgmt wpa-psk');
     await execAsync(`nmcli con modify TodoAP wifi-sec.psk "${password}"`);
+    console.log("[START-HOTSPOT] Konfiguracja AP zakończona");
     
     // Aktywuj AP
-    await execAsync('nmcli con up TodoAP');
+    console.log("[START-HOTSPOT] Aktywuję AP...");
+    const { stdout: upResult } = await execAsync('nmcli con up TodoAP');
+    console.log("[START-HOTSPOT] Up result:", upResult);
+    
+    // Sprawdź status
+    const { stdout: finalStatus } = await execAsync('nmcli con show --active');
+    console.log("[START-HOTSPOT] Aktywne połączenia po aktywacji:", finalStatus);
     
     currentMode = "hotspot";
     hotspotInfo = { ssid, password };
+    console.log("[START-HOTSPOT] Sukces! Hotspot utworzony");
     res.json(hotspotInfo);
     
   } catch (error) {
-    console.error("Błąd uruchamiania hotspota:", error);
-    res.status(500).json({ error: "Nie można uruchomić hotspota" });
+    console.error("[START-HOTSPOT] BŁĄD:", error.message);
+    console.error("[START-HOTSPOT] Stack:", error.stack);
+    if (error.stdout) console.error("[START-HOTSPOT] stdout:", error.stdout);
+    if (error.stderr) console.error("[START-HOTSPOT] stderr:", error.stderr);
+    res.status(500).json({ error: "Nie można uruchomić hotspota", details: error.message });
   }
 });
 
@@ -192,17 +217,45 @@ app.post("/api/connect-wifi", async (req, res) => {
 
 // Endpoint do resetowania na tryb hotspot
 app.post("/api/reset-to-hotspot", async (req, res) => {
+  console.log("[RESET-HOTSPOT] Rozpoczynam reset do trybu hotspot...");
+  
   try {
+    // Sprawdź obecny stan
+    const { stdout: beforeStatus } = await execAsync('nmcli con show --active');
+    console.log("[RESET-HOTSPOT] Stan przed resetem:", beforeStatus);
+    
     // Rozłącz obecne połączenie
-    await execAsync('nmcli dev disconnect wlan0 2>/dev/null || true');
+    console.log("[RESET-HOTSPOT] Rozłączam wlan0...");
+    const { stdout: disconnectResult } = await execAsync('nmcli dev disconnect wlan0');
+    console.log("[RESET-HOTSPOT] Disconnect result:", disconnectResult);
+    
+    // Sprawdź czy TodoAP istnieje
+    const { stdout: conList } = await execAsync('nmcli con show');
+    console.log("[RESET-HOTSPOT] Lista połączeń:", conList);
+    
+    if (!conList.includes('TodoAP')) {
+      throw new Error("TodoAP nie istnieje - trzeba go najpierw utworzyć");
+    }
     
     // Aktywuj AP
-    await execAsync('nmcli con up TodoAP');
+    console.log("[RESET-HOTSPOT] Aktywuję TodoAP...");
+    const { stdout: upResult } = await execAsync('nmcli con up TodoAP');
+    console.log("[RESET-HOTSPOT] Up result:", upResult);
+    
+    // Sprawdź końcowy stan
+    const { stdout: afterStatus } = await execAsync('nmcli con show --active');
+    console.log("[RESET-HOTSPOT] Stan po resecie:", afterStatus);
     
     currentMode = "hotspot";
+    console.log("[RESET-HOTSPOT] Sukces! Przełączono na tryb hotspot");
     res.json({ success: true, message: "Reset do trybu hotspot" });
+    
   } catch (error) {
-    res.status(500).json({ error: "Błąd resetowania" });
+    console.error("[RESET-HOTSPOT] BŁĄD:", error.message);
+    console.error("[RESET-HOTSPOT] Stack:", error.stack);
+    if (error.stdout) console.error("[RESET-HOTSPOT] stdout:", error.stdout);
+    if (error.stderr) console.error("[RESET-HOTSPOT] stderr:", error.stderr);
+    res.status(500).json({ error: "Błąd resetowania", details: error.message });
   }
 });
 
