@@ -148,7 +148,12 @@ function App() {
     return (
       <div className="App">
         <h1>Konfiguracja WiFi</h1>
-                <div className="hotspot-info">
+        <div className="connection-details">
+          <h3>Dane połączenia:</h3>
+          <p><strong>Sieć:</strong> {hotspotInfo.ssid}</p>
+          <p><strong>Hasło:</strong> {hotspotInfo.password}</p>
+        </div>
+        <div className="hotspot-info">
           <div className="qr-section">
             <div className="qr-code">
               <canvas id="qr-code"></canvas>
@@ -157,12 +162,13 @@ function App() {
           <div className="instructions">
             <h3>Jak się połączyć?</h3>
             <ol>
-              <li>Zeskanuj kod QR telefonem</li>
-              <li>Połącz się z siecią WiFi</li>
-              <li>Otwórz przeglądarkę na 192.168.4.1</li>
+              <li><strong>Telefonem:</strong> Zeskanuj kod QR</li>
+              <li><strong>Ręcznie:</strong> Połącz z siecią <strong>{hotspotInfo.ssid}</strong></li>
+              <li>Hasło: <strong>{hotspotInfo.password}</strong></li>
+              <li>Otwórz przeglądarkę na <strong>192.168.100.1</strong></li>
             </ol>
             <button onClick={scanNetworks} style={{ marginTop: '20px' }}>
-              Konfiguruj WiFi
+              Skonfiguruj połączenie z internetem
             </button>
           </div>
         </div>

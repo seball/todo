@@ -234,7 +234,23 @@ app.post("/api/reset-to-hotspot", async (req, res) => {
     console.log("[RESET-HOTSPOT] Lista połączeń:", conList);
     
     if (!conList.includes('TodoAP')) {
-      throw new Error("TodoAP nie istnieje - trzeba go najpierw utworzyć");
+      console.log("[RESET-HOTSPOT] TodoAP nie istnieje - tworzę nowy...");
+      
+      // Utwórz nowy AP z aktualnymi danymi
+      const ssid = 'TOMAK69';
+      const password = 'tomak12345';
+      
+      await execAsync(`nmcli con add type wifi ifname wlan0 con-name TodoAP autoconnect no ssid "${ssid}"`);
+      await execAsync('nmcli con modify TodoAP 802-11-wireless.mode ap');
+      await execAsync('nmcli con modify TodoAP 802-11-wireless.band bg');
+      await execAsync('nmcli con modify TodoAP ipv4.method shared');
+      await execAsync('nmcli con modify TodoAP ipv4.addresses 192.168.100.1/24');
+      await execAsync('nmcli con modify TodoAP wifi-sec.key-mgmt wpa-psk');
+      await execAsync(`nmcli con modify TodoAP wifi-sec.psk "${password}"`);
+      
+      // Ustaw hotspotInfo
+      hotspotInfo = { ssid, password };
+      console.log("[RESET-HOTSPOT] Nowy TodoAP utworzony");
     }
     
     // Aktywuj AP
