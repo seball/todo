@@ -157,7 +157,7 @@ app.get("/api/scan-networks", async (req, res) => {
       .filter(net => net.ssid && net.ssid !== '--')
       .sort((a, b) => b.signal - a.signal);
     
-    console.log(`[SCAN-NETWORKS] Znaleziono ${networks.length} sieci:`, networks.map(n => `${n.ssid} (${n.signal}%)`);
+    console.log(`[SCAN-NETWORKS] Znaleziono ${networks.length} sieci:`, networks.map(n => `${n.ssid} (${n.signal}%)`));
     res.json({ networks });
     
   } catch (error) {
