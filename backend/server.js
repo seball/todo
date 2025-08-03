@@ -129,13 +129,21 @@ app.post("/api/start-hotspot", async (req, res) => {
 
 // Endpoint do skanowania sieci WiFi
 app.get("/api/scan-networks", async (req, res) => {
+  console.log("[SCAN-NETWORKS] Rozpoczynam skanowanie sieci WiFi...");
+  
   try {
     // Wymuś nowe skanowanie
-    await execAsync('nmcli dev wifi rescan');
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Poczekaj na wyniki
+    console.log("[SCAN-NETWORKS] Uruchamiam rescan...");
+    const { stdout: rescanResult } = await execAsync('nmcli dev wifi rescan');
+    console.log("[SCAN-NETWORKS] Rescan result:", rescanResult);
+    
+    await new Promise(resolve => setTimeout(resolve, 3000)); // Poczekaj na wyniki
+    console.log("[SCAN-NETWORKS] Pobieram listę sieci...");
     
     // Pobierz listę sieci
     const { stdout } = await execAsync('nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list');
+    console.log("[SCAN-NETWORKS] Raw output:", stdout);
+    
     const networks = stdout.trim().split('\n')
       .filter(line => line)
       .map(line => {
@@ -149,9 +157,14 @@ app.get("/api/scan-networks", async (req, res) => {
       .filter(net => net.ssid && net.ssid !== '--')
       .sort((a, b) => b.signal - a.signal);
     
-    res.json(networks);
+    console.log(`[SCAN-NETWORKS] Znaleziono ${networks.length} sieci:`, networks.map(n => `${n.ssid} (${n.signal}%)`);
+    res.json({ networks });
+    
   } catch (error) {
-    console.error("Błąd skanowania sieci:", error);
+    console.error("[SCAN-NETWORKS] BŁĄD:", error.message);
+    console.error("[SCAN-NETWORKS] Stack:", error.stack);
+    if (error.stdout) console.error("[SCAN-NETWORKS] stdout:", error.stdout);
+    if (error.stderr) console.error("[SCAN-NETWORKS] stderr:", error.stderr);
     res.status(500).json({ error: "Nie można zeskanować sieci" });
   }
 });
