@@ -1,13 +1,11 @@
 const express = require("express");
-const bodyParser = require("body-parser");
 const { exec, execSync } = require("child_process");
 const path = require("path");
 const { promisify } = require('util');
 const execAsync = promisify(exec);
 
 const app = express();
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(express.json());
 
 // Serwuj pliki React build
 app.use(express.static(path.join(__dirname, "../frontend/build")));
